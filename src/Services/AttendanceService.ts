@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://attendmate-backend.onrender.com/api";
+const API_URL = import.meta.env.VITE_API_URL || "https://attendmate-backend-femy.onrender.com/api";
 const SOCKET_URL = API_URL.replace("/api", "");
 
 const socket = io(SOCKET_URL, {
