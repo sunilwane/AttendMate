@@ -1,15 +1,12 @@
 const API_URL =
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.DEV
-    ? "http://localhost:5000/api"
-    : "https://attendmate-backend-femy.onrender.com/api");
+  import.meta.env.VITE_API_URL || "https://attendmate-backend-femy.onrender.com/api";
 
 const getToken = (): string | null => localStorage.getItem("employeeToken");
 
 const getLoggedInEmployeeId = (): string | number | null => {
   const employeeDataStr = localStorage.getItem("employeeData");
   if (!employeeDataStr) {
-   
+
     return null;
   }
   try {
@@ -23,7 +20,7 @@ const getLoggedInEmployeeId = (): string | number | null => {
       null;
     return id;
   } catch (e) {
-   
+
     return null;
   }
 };
@@ -46,13 +43,13 @@ export const submitLeaveRequest = async (data: any) => {
   try {
     const token = getToken();
     if (!token) {
-    
+
       return { success: false, message: "Not authorized" };
     }
 
     const empId = await fetchEmployeeId("");
     if (!empId) {
-    
+
       return { success: false, message: "Employee ID missing" };
     }
 
@@ -67,20 +64,18 @@ export const submitLeaveRequest = async (data: any) => {
       reason: data.reason || "",
     };
 
-   
+
 
     // Try multiple possible endpoints
     const endpoints = [
       `${API_URL}/leaves/request`,
       `${API_URL}/leave/request`,
-      `http://localhost:5000/api/leaves/request`,
-      `http://localhost:5000/api/leave/request`
     ];
 
     let lastError = null;
     for (const url of endpoints) {
       try {
-      
+
         const res = await fetch(url, {
           method: "POST",
           headers: {
@@ -92,22 +87,22 @@ export const submitLeaveRequest = async (data: any) => {
 
         if (res.ok) {
           const result = await res.json();
-       
+
           return { success: true };
         } else if (res.status !== 404) {
           const err = await res.json();
-        
+
           return { success: false, error: err.message };
         }
       } catch (e) {
         lastError = e;
-       
+
       }
     }
 
     return { success: false, error: "Failed to connect to server" };
   } catch (err) {
-   
+
     return { success: false };
   }
 };
@@ -119,7 +114,7 @@ export const fetchMyLeaveRequestsFromApi = async (_email?: string) => {
 
     const empId = getLoggedInEmployeeId();
     if (!empId) {
-     
+
       return [];
     }
 
@@ -127,14 +122,12 @@ export const fetchMyLeaveRequestsFromApi = async (_email?: string) => {
     const endpoints = [
       `${API_URL}/leaves/employee/${empId}`,
       `${API_URL}/leave/employee/${empId}`,
-      `http://localhost:5000/api/leaves/employee/${empId}`,
-      `http://localhost:5000/api/leave/employee/${empId}`
     ];
 
     let rawData = null;
     for (const url of endpoints) {
       try {
-      
+
         const res = await fetch(url, {
           method: "GET",
           headers: {
@@ -145,40 +138,61 @@ export const fetchMyLeaveRequestsFromApi = async (_email?: string) => {
 
         if (res.ok) {
           rawData = await res.json();
-          
           break;
         }
       } catch (e) {
-       
+
       }
     }
 
-    if (!rawData) return [];
+    if (!rawData) {
+      console.warn("⚠️ LeaveService: No raw data received from any endpoint");
+      return [];
+    }
 
-    // Flattening grouped data: [{ date: "...", employees: [...] }]
+    // Flattening grouped data: [{ date: "...", leave_request: [...] }]
     let flattened: any[] = [];
     if (Array.isArray(rawData)) {
       rawData.forEach((group: any) => {
-        if (group.employees && Array.isArray(group.employees)) {
-          // Add the date from parent if child doesn't have it (fallback)
-          group.employees.forEach((emp: any) => {
-            flattened.push({ ...emp, parentDate: group.date });
+        // Handle 'leave_request' or 'employees' keys
+        const items = group.leave_request || group.employees;
+        if (items && Array.isArray(items)) {
+          items.forEach((item: any) => {
+            flattened.push({ ...item, parentDate: group.date });
           });
         } else if (group.employeeId) {
           flattened.push(group);
         }
       });
-    } else if (rawData?.leaves || rawData?.data) {
-      flattened = rawData.leaves || rawData.data;
+    } else if (rawData?.leaves && Array.isArray(rawData.leaves)) {
+      flattened = rawData.leaves;
+    } else if (rawData?.employees && Array.isArray(rawData.employees)) {
+      flattened = rawData.employees;
+    } else if (rawData?.data && Array.isArray(rawData.data)) {
+      flattened = rawData.data;
     }
 
-    
-    const mapped = flattened.map((req: any) => {
-      const startDate = req.fromDate || req.startDate || req.parentDate || "";
-      const endDate = req.toDate || req.endDate || startDate || "";
 
-      const cleanStart = typeof startDate === "string" ? startDate.split("T")[0] : "";
-      const cleanEnd = typeof endDate === "string" ? endDate.split("T")[0] : "";
+    const normalizeDate = (dateStr: any) => {
+      if (!dateStr) return "";
+      try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return String(dateStr).split("T")[0];
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      } catch {
+        return String(dateStr).split("T")[0];
+      }
+    };
+
+    const mapped = flattened.map((req: any) => {
+      const startRaw = req.fromDate || req.startDate || req.parentDate || req.date || "";
+      const endRaw = req.toDate || req.endDate || startRaw || "";
+
+      const cleanStart = normalizeDate(startRaw);
+      const cleanEnd = normalizeDate(endRaw);
 
       let totalDays = req.totalDays || req.days || 0;
       if (!totalDays && cleanStart && cleanEnd) {
@@ -199,10 +213,8 @@ export const fetchMyLeaveRequestsFromApi = async (_email?: string) => {
       };
     });
 
-    
     return mapped;
   } catch (err) {
-   
     return [];
   }
 };

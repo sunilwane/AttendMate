@@ -69,15 +69,13 @@ export const createTicket = async (data: CreateTicketData): Promise<{ success: b
         const endpoints = [
             `${API_URL}/help/tickets`,
             `${API_URL}/support/tickets`,
-            `http://localhost:5000/api/help/tickets`,
-            `http://localhost:5000/api/support/tickets`,
         ];
 
         let lastError = null;
 
         for (const url of endpoints) {
             try {
-               
+
 
                 const res = await fetch(url, {
                     method: "POST",
@@ -88,11 +86,11 @@ export const createTicket = async (data: CreateTicketData): Promise<{ success: b
                     body: JSON.stringify(payload),
                 });
 
-               
+
 
                 if (res.ok) {
                     const ticket = await res.json();
-                    
+
                     return { success: true, ticket };
                 } else if (res.status !== 404) {
                     // If it's not a 404, it means the route exists but there's another error
@@ -184,7 +182,6 @@ export const addReply = async (ticketId: string, message: string): Promise<{ suc
 
         const endpoints = [
             `${API_URL}/help/tickets/${ticketId}/reply`,
-            `http://localhost:5000/api/help/tickets/${ticketId}/reply`,
         ];
 
         let lastError = null;
