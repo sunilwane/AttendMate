@@ -124,6 +124,8 @@ const ProfileCom: React.FC<ProfileComProps> = ({ onLogout }) => {
                 onClick={() => {
                   if (item.label === "Leave Request") {
                     history.push("/leave-request");
+                  } else if (item.label === "Help & Support") {
+                    history.push("/help-support");
                   } else {
                     alert(`${item.label} (Coming soon...)`);
                   }

@@ -17,6 +17,7 @@ import Login from "./auth/Login";
 import HomeTabs from "./routes/Routing";
 import LeaveReqPage from "./pages/LeaveReqPage";
 import LeaveForm from "./components/Leave-Form";
+import HelpSupportPage from "./pages/HelpSupportPage";
 
 import "@ionic/react/css/core.css";
 import "@ionic/react/css/normalize.css";
@@ -53,7 +54,7 @@ const updateStatusBarForInvertedCutout = async () => {
 
         await StatusBar.setOverlaysWebView({ overlay: true });
     } catch (error) {
-        console.log("Status bar update failed:", error);
+       
     }
 };
 
@@ -130,6 +131,9 @@ const App: React.FC = () => {
                         </Route>
                         <Route path="/leave-request">
                             {isLoggedIn ? <LeaveReqPage /> : <Redirect to="/login" />}
+                        </Route>
+                        <Route path="/help-support">
+                            {isLoggedIn ? <HelpSupportPage /> : <Redirect to="/login" />}
                         </Route>
                     </IonRouterOutlet>
                 </IonReactRouter>

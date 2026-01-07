@@ -5,10 +5,11 @@ import {
   IonList,
   IonItem,
   IonSpinner,
-  IonIcon
+  IonIcon,
+  IonBadge
 } from "@ionic/react";
 
-import { personCircleOutline } from "ionicons/icons";
+import { personCircleOutline, notificationsOutline } from "ionicons/icons";
 
 import Logo from "../assets/main_logo.png";
 import ProfileIcon from "../assets/user.png";
@@ -17,6 +18,8 @@ import LogoutIcon from "../assets/logout.png";
 import "../theme/components/AppHeader.css";
 import { fetchHeaderUserData } from "../Services/HeaderService";
 import ConfirmLogoutPopup from "./ConfirmLogoutPopup";
+import Notifications from "./Notifications";
+import { fetchNotifications } from "../Services/NotificationService";
 
 const AppHeader: React.FC<{ title?: string }> = ({ title = "AttendMate" }) => {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -24,8 +27,13 @@ const AppHeader: React.FC<{ title?: string }> = ({ title = "AttendMate" }) => {
   const [loadingPhoto, setLoadingPhoto] = useState(true);
   const [photoError, setPhotoError] = useState(false);
 
-  const [showPopover, setShowPopover] = useState(false);
-  const [popoverEvent, setPopoverEvent] = useState<any>(null);
+  const [showProfilePopover, setShowProfilePopover] = useState(false);
+  const [profilePopoverEvent, setProfilePopoverEvent] = useState<any>(null);
+
+  const [showNotificationPopover, setShowNotificationPopover] = useState(false);
+  const [notificationPopoverEvent, setNotificationPopoverEvent] = useState<any>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const userEmail = localStorage.getItem("userEmail");
@@ -41,7 +49,13 @@ const AppHeader: React.FC<{ title?: string }> = ({ title = "AttendMate" }) => {
       setLoadingPhoto(false);
     };
 
+    const loadInitialNotifications = async () => {
+      const data = await fetchNotifications();
+      setUnreadCount(data.filter(n => !n.isRead).length);
+    };
+
     loadUserData();
+    loadInitialNotifications();
   }, [userEmail]);
 
   const logout = () => {
@@ -68,34 +82,64 @@ const AppHeader: React.FC<{ title?: string }> = ({ title = "AttendMate" }) => {
         <h1 className="app-title">{title}</h1>
       </div>
 
-      <div
-        slot="end"
-        className="avatar-trigger"
-        onClick={(e) => {
-          setPopoverEvent(e.nativeEvent);
-          setShowPopover(true);
-        }}
-      >
-        {loadingPhoto ? (
-          <IonSpinner name="dots" color="medium" className="avatar-size" />
-        ) : photoUrl && !photoError ? (
-          <img
-            src={photoUrl}
-            alt="Profile"
-            className="avatar-size"
-            onError={() => setPhotoError(true)}
-          />
-        ) : (
-          <div className="avatar-fallback">
-            {getInitial()}
-          </div>
-        )}
+      <div slot="end" className="header-right">
+        <div
+          className="notification-trigger"
+          onClick={(e) => {
+            setNotificationPopoverEvent(e.nativeEvent);
+            setShowNotificationPopover(true);
+          }}
+        >
+          <IonIcon icon={notificationsOutline} className="notification-icon-header" />
+          {unreadCount > 0 && (
+            <IonBadge color="danger" className="notification-badge">
+              {unreadCount}
+            </IonBadge>
+          )}
+        </div>
+
+        <div
+          className="avatar-trigger"
+          onClick={(e) => {
+            setProfilePopoverEvent(e.nativeEvent);
+            setShowProfilePopover(true);
+          }}
+        >
+          {loadingPhoto ? (
+            <IonSpinner name="dots" color="medium" className="avatar-size" />
+          ) : photoUrl && !photoError ? (
+            <img
+              src={photoUrl}
+              alt="Profile"
+              className="avatar-size"
+              onError={() => setPhotoError(true)}
+            />
+          ) : (
+            <div className="avatar-fallback">
+              {getInitial()}
+            </div>
+          )}
+        </div>
       </div>
 
       <IonPopover
-        isOpen={showPopover}
-        event={popoverEvent}
-        onDidDismiss={() => setShowPopover(false)}
+        isOpen={showNotificationPopover}
+        event={notificationPopoverEvent}
+        onDidDismiss={() => setShowNotificationPopover(false)}
+        backdropDismiss={true}
+        className="notifications-popover"
+        size="auto"
+      >
+        <Notifications
+          onUnreadCountChange={setUnreadCount}
+          onClose={() => setShowNotificationPopover(false)}
+        />
+      </IonPopover>
+
+      <IonPopover
+        isOpen={showProfilePopover}
+        event={profilePopoverEvent}
+        onDidDismiss={() => setShowProfilePopover(false)}
         backdropDismiss={true}
         showBackdrop={true}
         side="bottom"
@@ -110,7 +154,7 @@ const AppHeader: React.FC<{ title?: string }> = ({ title = "AttendMate" }) => {
             button
             routerLink="/profile"
             detail={false}
-            onClick={() => setShowPopover(false)}
+            onClick={() => setShowProfilePopover(false)}
           >
             <img src={ProfileIcon} className="menu-icon" />
             View Profile
@@ -120,7 +164,7 @@ const AppHeader: React.FC<{ title?: string }> = ({ title = "AttendMate" }) => {
             button
             detail={false}
             onClick={() => {
-              setShowPopover(false);
+              setShowProfilePopover(false);
               setShowLogoutConfirm(true);
             }}
           >
