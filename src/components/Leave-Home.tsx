@@ -28,41 +28,75 @@ const LeaveHome: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     const getStatusClass = (status: string) => {
-        const s = status.toLowerCase();
+        const s = (status || "").toLowerCase();
         if (s === "approved") return "approved-status";
         if (s === "rejected") return "rejected-status";
         if (s === "cancelled") return "rejected-status";
         return "pending-status";
     };
 
+    const getIconClass = (type: string) => {
+        const t = (type || "").toLowerCase();
+        if (t.includes("sick")) return "sick-icon";
+        if (t.includes("personal")) return "personal-icon";
+        return "annual-icon";
+    };
+
+    const getIcon = (type: string) => {
+        const t = (type || "").toLowerCase();
+        if (t.includes("sick")) return medkitOutline;
+        if (t.includes("personal")) return personOutline;
+        return calendarOutline;
+    };
+
     useEffect(() => {
         if (!userEmail) return;
-        let unsubscribe: (() => void) | null = null;
+        setLoading(true);
 
-        listenToMyLeaveRequests(userEmail, (data: any[]) => {
+        const unsubscribe = listenToMyLeaveRequests(userEmail, (data: any[]) => {
+          
             setLeaveRequests(data);
             setLoading(false);
-        }).then((unsub) => {
-            unsubscribe = unsub;
         });
 
         return () => {
-            if (unsubscribe) {
-                unsubscribe();
-            }
+            unsubscribe();
         };
     }, [userEmail]);
 
-    const today = new Date().toISOString().split("T")[0];
-    const upcoming = leaveRequests.filter((l) => l.startDate >= today);
-    const historyList = leaveRequests.filter((l) => l.startDate < today);
+    const getTodayDateString = () => {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+    };
+
+    const today = getTodayDateString();
+
+    // Derived lists
+    const sortedAll = [...leaveRequests].sort((a, b) =>
+        String(a.startDate || "").localeCompare(String(b.startDate || ""))
+    );
+
+    const upcoming = sortedAll.filter((l) => {
+        const dateToCompare = l.endDate || l.startDate;
+        return dateToCompare && dateToCompare >= today;
+    });
+
+    const historyList = sortedAll.filter((l) => {
+        const dateToCompare = l.endDate || l.startDate;
+        return !dateToCompare || dateToCompare < today;
+    }).reverse();
+
+    
 
     const filteredHistory =
         historyFilter === "All"
             ? historyList
             : historyList.filter(
                 (req) =>
-                    req.status.toLowerCase() === historyFilter.toLowerCase()
+                    req.status?.toLowerCase() === historyFilter.toLowerCase()
             );
 
     const SkeletonCard = () => (
@@ -122,11 +156,11 @@ const LeaveHome: React.FC = () => {
                         ) : upcoming.length === 0 ? (
                             <p className="no-data">You don't have any upcoming requests.</p>
                         ) : (
-                            upcoming.map((req) => (
-                                <IonCard className="request-card" key={req.id}>
+                            upcoming.map((req, idx) => (
+                                <IonCard className="request-card" key={req.id || idx}>
                                     <IonCardContent className="request-content">
-                                        <div className="request-icon-wrapper annual-icon">
-                                            <IonIcon icon={calendarOutline} />
+                                        <div className={`request-icon-wrapper ${getIconClass(req.leaveType)}`}>
+                                            <IonIcon icon={getIcon(req.leaveType)} />
                                         </div>
                                         <div className="request-info">
                                             <p className="request-title">{req.leaveType} Leave</p>
@@ -151,11 +185,11 @@ const LeaveHome: React.FC = () => {
                         ) : filteredHistory.length === 0 ? (
                             <p className="no-data">You don't have any past requests.</p>
                         ) : (
-                            filteredHistory.map((req) => (
-                                <IonCard className="request-card" key={req.id}>
+                            filteredHistory.map((req, idx) => (
+                                <IonCard className="request-card" key={req.id || idx}>
                                     <IonCardContent className="request-content">
-                                        <div className="request-icon-wrapper personal-icon">
-                                            <IonIcon icon={personOutline} />
+                                        <div className={`request-icon-wrapper ${getIconClass(req.leaveType)}`}>
+                                            <IonIcon icon={getIcon(req.leaveType)} />
                                         </div>
                                         <div className="request-info">
                                             <p className="request-title">{req.leaveType} Leave</p>

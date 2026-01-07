@@ -28,10 +28,25 @@ const LeaveForm: React.FC = () => {
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorTitle, setErrorTitle] = useState("Missing Fields");
+  const [errorMessage, setErrorMessage] = useState(
+    "Please fill all required fields before submitting."
+  );
 
   const userEmail = localStorage.getItem("userEmail");
 
   const today = new Date().toISOString().split("T")[0];
+
+  const toDateOnly = (value: string) => (value ? value.split("T")[0] : "");
+
+  const diffInDaysInclusive = (start: string, end: string) => {
+    if (!start || !end) return 0;
+    const startMs = new Date(`${start}T00:00:00`).getTime();
+    const endMs = new Date(`${end}T00:00:00`).getTime();
+    const diff = (endMs - startMs) / (1000 * 60 * 60 * 24);
+    if (!Number.isFinite(diff) || diff < 0) return 0;
+    return Math.round(diff) + 1;
+  };
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
@@ -42,20 +57,26 @@ const LeaveForm: React.FC = () => {
     });
   };
 
-  const totalDays =
-    startDate && endDate
-      ? (new Date(endDate).getTime() - new Date(startDate).getTime()) /
-          (1000 * 60 * 60 * 24) +
-        1
-      : 0;
+  const totalDays = diffInDaysInclusive(startDate, endDate);
 
   const handleSubmit = async () => {
     if (!leaveType || !startDate || !endDate || !totalDays) {
+      setErrorTitle("Missing Fields");
+      setErrorMessage("Please fill all required fields before submitting.");
       setShowErrorModal(true);
       return;
     }
 
     if (!userEmail) {
+      setErrorTitle("Not Logged In");
+      setErrorMessage("Please log in again and then submit your request.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (endDate < startDate) {
+      setErrorTitle("Invalid Dates");
+      setErrorMessage("End date cannot be before start date.");
       setShowErrorModal(true);
       return;
     }
@@ -74,6 +95,8 @@ const LeaveForm: React.FC = () => {
     if (result.success) {
       setShowSuccessModal(true);
     } else {
+      setErrorTitle("Request Failed");
+      setErrorMessage("Failed to submit your leave request. Please try again.");
       setShowErrorModal(true);
     }
   };
@@ -124,7 +147,11 @@ const LeaveForm: React.FC = () => {
                     value={startDate}
                     min={today}
                     onIonChange={(e) => {
-                      if (e.detail.value) setStartDate(e.detail.value as string);
+                      if (e.detail.value) {
+                        const next = toDateOnly(e.detail.value as string);
+                        setStartDate(next);
+                        if (endDate && endDate < next) setEndDate("");
+                      }
                       setShowStartPicker(false);
                     }}
                   />
@@ -154,7 +181,7 @@ const LeaveForm: React.FC = () => {
                     value={endDate}
                     min={startDate || today}
                     onIonChange={(e) => {
-                      if (e.detail.value) setEndDate(e.detail.value as string);
+                      if (e.detail.value) setEndDate(toDateOnly(e.detail.value as string));
                       setShowEndPicker(false);
                     }}
                   />
@@ -235,11 +262,11 @@ const LeaveForm: React.FC = () => {
             </div>
 
             <h2 className="alert-modal-title" style={{ color: "#ff4444" }}>
-              Missing Fields
+              {errorTitle}
             </h2>
 
             <p className="alert-modal-message">
-              Please fill all required fields before submitting.
+              {errorMessage}
             </p>
 
             <IonButton

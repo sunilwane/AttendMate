@@ -17,6 +17,8 @@ import {
 import "../theme/components/Login.css";
 import Logo from "../assets/main_logo.png";
 
+import { loginEmployee } from "../Services/AuthService";
+
 interface LoginProps {
     onLogin: (email: string) => void;
 }
@@ -34,13 +36,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const [diagHeader, setDiagHeader] = useState("");
     const [diagMessage, setDiagMessage] = useState("");
 
-    const emailRef = useRef(email);
-    const passwordRef = useRef(password);
     const contentRef = useRef<HTMLIonContentElement>(null);
-
-
-    const API_URL = import.meta.env.VITE_API_URL || "https://attendmate-backend-femy.onrender.com/api";
-
 
     const scrollUpForPassword = () => {
         setTimeout(() => {
@@ -68,54 +64,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         };
     }, []);
 
-    const runDiagnostics = async () => {
-        setLoading(true);
-        setDiagHeader("Running Diagnostics...");
-        setDiagMessage("Testing connections, please wait...");
-        setShowDiagAlert(true);
-
-        const results = [];
-
-        // 1. Test Public API
-        try {
-            const start = Date.now();
-            const res = await fetch("https://jsonplaceholder.typicode.com/posts/1");
-            const duration = Date.now() - start;
-            results.push(`✅ Public API (JsonPlaceholder): OK (${duration}ms)`);
-        } catch (err: any) {
-            results.push(`❌ Public API: FAILED (${err.message})`);
-        }
-
-        // 2. Test Backend Health (Root)
-        try {
-            const baseUrl = API_URL.replace("/api", "");
-            const start = Date.now();
-            const res = await fetch(baseUrl);
-            const duration = Date.now() - start;
-            results.push(`✅ Backend Root: OK (${duration}ms) - Status: ${res.status}`);
-        } catch (err: any) {
-            results.push(`❌ Backend Root: FAILED (${err.message})`);
-        }
-
-        // 3. Test Backend API Endpoint
-        try {
-            const start = Date.now();
-            const res = await fetch(`${API_URL}/employees/login`, { method: "GET" });
-            const duration = Date.now() - start;
-            results.push(`✅ Backend /api/employees/login: OK (${duration}ms) - Status: ${res.status}`);
-        } catch (err: any) {
-            results.push(`❌ Backend API: FAILED (${err.message}). This usually means CORS is blocking the request from the app.`);
-        }
-
-        setLoading(false);
-        setDiagHeader("Diagnostic Results");
-        setDiagMessage(results.join("\n\n"));
-    };
-
     const handleLogin = async () => {
-
-        const trimmedEmail = emailRef.current.trim();
-        const trimmedPassword = passwordRef.current.trim();
+        const trimmedEmail = email.trim();
+        const trimmedPassword = password.trim();
 
         if (!trimmedEmail || !trimmedPassword) {
             setToastMessage("Please enter email and password");
@@ -124,63 +75,40 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             return;
         }
 
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmedEmail)) {
+            setToastMessage("Please enter a valid email address");
+            setToastColor("danger");
+            setShowToast(true);
+            return;
+        }
+
         setLoading(true);
 
-        try {
+        const result = await loginEmployee(trimmedEmail, trimmedPassword);
 
-            const response = await fetch(`${API_URL}/employees/login`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    email: trimmedEmail,
-                    password: trimmedPassword,
-                }),
-            });
+        if (result.success && result.data) {
+            setToastMessage("Login successful!");
+            setToastColor("success");
+            setShowToast(true);
 
-            const data = await response.json();
-
-            if (response.ok && data.token) {
-                localStorage.setItem("employeeToken", data.token);
-                localStorage.setItem("employeeData", JSON.stringify(data.employee));
-                localStorage.setItem("userEmail", data.employee.email);
-                localStorage.setItem("isLoggedIn", "true");
-
-
-                setToastMessage("Login successful!");
-                setToastColor("success");
-                setShowToast(true);
-
-                setTimeout(() => {
-                    setLoading(false);
-                    onLogin(data.employee.email);
-                    window.location.href = "/home";
-                }, 800);
-            } else {
-                setToastMessage(data.message || "Invalid email or password");
-                setToastColor("danger");
-                setShowToast(true);
+            setTimeout(() => {
                 setLoading(false);
-            }
-        } catch (error: any) {
-            console.error("Login error:", error);
-            let errorMessage = "Login failed. Please check your connection.";
-
-            if (error instanceof TypeError) {
-                if (error.message.includes("fetch")) {
-                    errorMessage = "Failed to connect to the server. Please check if the backend is running and accessible.";
-                } else if (error.message.includes("NetworkError")) {
-                    errorMessage = "Network error. Please check your internet connection.";
-                }
-            } else if (error.message) {
-                errorMessage = `Login error: ${error.message}`;
-            }
-
-            setToastMessage(errorMessage);
+                onLogin(result.data.employee.email);
+                window.location.href = "/home";
+            }, 800);
+        } else {
+            setToastMessage(result.message || "Invalid email or password");
             setToastColor("danger");
             setShowToast(true);
             setLoading(false);
+        }
+    };
+
+    // Handle Enter key press for form submission
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleLogin();
         }
     };
 
@@ -203,10 +131,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             placeholder="Enter your email"
                             className="field-input"
                             value={email}
-                            onChange={(e) => {
-                                setEmail(e.target.value);
-                                emailRef.current = e.target.value;
-                            }}
+                            onChange={(e) => setEmail(e.target.value)}
+                            onKeyPress={handleKeyPress}
+                            autoComplete="email"
                         />
                     </div>
 
@@ -218,11 +145,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             placeholder="Enter your password"
                             className="field-input"
                             value={password}
-                            onChange={(e) => {
-                                setPassword(e.target.value);
-                                passwordRef.current = e.target.value;
-                            }}
+                            onChange={(e) => setPassword(e.target.value)}
                             onFocus={scrollUpForPassword}
+                            onKeyPress={handleKeyPress}
+                            autoComplete="current-password"
                         />
                         <IonIcon
                             icon={showPassword ? eyeOffOutline : eyeOutline}
@@ -259,24 +185,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     <IonToast
                         isOpen={showToast}
                         message={toastMessage}
-                        duration={2000}
+                        duration={3000}
                         position="top"
                         color={toastColor}
                         onDidDismiss={() => setShowToast(false)}
                         style={{ "--border-radius": "10px" }}
                     />
-
-                    <div style={{ marginTop: "20px", textAlign: "center" }}>
-                        <IonButton
-                            fill="clear"
-                            size="small"
-                            color="medium"
-                            onClick={runDiagnostics}
-                            style={{ "--opacity": "0.6", fontSize: "12px" }}
-                        >
-                            Run Connection Diagnostics
-                        </IonButton>
-                    </div>
 
                     <IonAlert
                         isOpen={showDiagAlert}

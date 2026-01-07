@@ -1,84 +1,238 @@
-import {
-  query,
-  where,
-  getDocs,
-  setDoc,
-  getDoc,
-  collection,
-  onSnapshot,
-  serverTimestamp,
-} from "firebase/firestore";
-import DB from "../config/databaseConfig";
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV
+    ? "http://localhost:5000/api"
+    : "https://attendmate-backend-femy.onrender.com/api");
 
-export const fetchEmployeeId = async (email: string) => {
-  const q = query(DB.collections.Employee_Details, where("Email", "==", email));
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) return null;
-  return snapshot.docs[0].data().EmployeeID;
+const getToken = (): string | null => localStorage.getItem("employeeToken");
+
+const getLoggedInEmployeeId = (): string | number | null => {
+  const employeeDataStr = localStorage.getItem("employeeData");
+  if (!employeeDataStr) {
+   
+    return null;
+  }
+  try {
+    const employeeData = JSON.parse(employeeDataStr);
+    const id =
+      employeeData?.employeeId ||
+      employeeData?.EmployeeID ||
+      employeeData?.employee_id ||
+      employeeData?.id ||
+      employeeData?._id ||
+      null;
+    return id;
+  } catch (e) {
+   
+    return null;
+  }
+};
+
+const getEmployeeData = () => {
+  const data = localStorage.getItem("employeeData");
+  if (!data) return null;
+  try {
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
+};
+
+export const fetchEmployeeId = async (_email: string) => {
+  return getLoggedInEmployeeId();
 };
 
 export const submitLeaveRequest = async (data: any) => {
   try {
-    if (!data.email) return { success: false };
+    const token = getToken();
+    if (!token) {
+    
+      return { success: false, message: "Not authorized" };
+    }
 
-    const empId = await fetchEmployeeId(data.email);
-    if (!empId) return { success: false };
+    const empId = await fetchEmployeeId("");
+    if (!empId) {
+    
+      return { success: false, message: "Employee ID missing" };
+    }
 
     const cleanStart = data.startDate ? data.startDate.split("T")[0] : "";
     const cleanEnd = data.endDate ? data.endDate.split("T")[0] : "";
 
-    const dateKey = cleanStart;
+    const payload = {
+      employeeId: empId,
+      leaveType: data.leaveType,
+      fromDate: cleanStart, // Per backend schema
+      toDate: cleanEnd,     // Per backend schema
+      reason: data.reason || "",
+    };
 
-    const totalDays =
-      Math.round(
-        (new Date(cleanEnd).getTime() - new Date(cleanStart).getTime()) /
-        (1000 * 60 * 60 * 24)
-      ) + 1;
+   
 
-    await setDoc(
-      DB.Leave.LeaveByEmpAndDate(empId, dateKey),
-      {
-        EmployeeID: empId,
-        email: data.email,
-        leaveType: data.leaveType,
-        startDate: cleanStart,
-        endDate: cleanEnd,
-        totalDays: totalDays,
-        reason: data.reason || "",
-        status: "pending",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+    // Try multiple possible endpoints
+    const endpoints = [
+      `${API_URL}/leaves/request`,
+      `${API_URL}/leave/request`,
+      `http://localhost:5000/api/leaves/request`,
+      `http://localhost:5000/api/leave/request`
+    ];
 
-    return { success: true };
-  } catch {
+    let lastError = null;
+    for (const url of endpoints) {
+      try {
+      
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+       
+          return { success: true };
+        } else if (res.status !== 404) {
+          const err = await res.json();
+        
+          return { success: false, error: err.message };
+        }
+      } catch (e) {
+        lastError = e;
+       
+      }
+    }
+
+    return { success: false, error: "Failed to connect to server" };
+  } catch (err) {
+   
     return { success: false };
   }
 };
 
-export const getMyLeaveRequests = async (email: string) => {
-  const empId = await fetchEmployeeId(email);
-  if (!empId) return [];
+export const fetchMyLeaveRequestsFromApi = async (_email?: string) => {
+  try {
+    const token = getToken();
+    if (!token) return [];
 
-  const datesRef = collection(DB.db, "Leave-req", empId, "dates");
-  const snapshot = await getDocs(datesRef);
+    const empId = getLoggedInEmployeeId();
+    if (!empId) {
+     
+      return [];
+    }
 
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    // Try multiple possible endpoints
+    const endpoints = [
+      `${API_URL}/leaves/employee/${empId}`,
+      `${API_URL}/leave/employee/${empId}`,
+      `http://localhost:5000/api/leaves/employee/${empId}`,
+      `http://localhost:5000/api/leave/employee/${empId}`
+    ];
+
+    let rawData = null;
+    for (const url of endpoints) {
+      try {
+      
+        const res = await fetch(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (res.ok) {
+          rawData = await res.json();
+          
+          break;
+        }
+      } catch (e) {
+       
+      }
+    }
+
+    if (!rawData) return [];
+
+    // Flattening grouped data: [{ date: "...", employees: [...] }]
+    let flattened: any[] = [];
+    if (Array.isArray(rawData)) {
+      rawData.forEach((group: any) => {
+        if (group.employees && Array.isArray(group.employees)) {
+          // Add the date from parent if child doesn't have it (fallback)
+          group.employees.forEach((emp: any) => {
+            flattened.push({ ...emp, parentDate: group.date });
+          });
+        } else if (group.employeeId) {
+          flattened.push(group);
+        }
+      });
+    } else if (rawData?.leaves || rawData?.data) {
+      flattened = rawData.leaves || rawData.data;
+    }
+
+    
+    const mapped = flattened.map((req: any) => {
+      const startDate = req.fromDate || req.startDate || req.parentDate || "";
+      const endDate = req.toDate || req.endDate || startDate || "";
+
+      const cleanStart = typeof startDate === "string" ? startDate.split("T")[0] : "";
+      const cleanEnd = typeof endDate === "string" ? endDate.split("T")[0] : "";
+
+      let totalDays = req.totalDays || req.days || 0;
+      if (!totalDays && cleanStart && cleanEnd) {
+        const d1 = new Date(cleanStart);
+        const d2 = new Date(cleanEnd);
+        totalDays = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        if (isNaN(totalDays)) totalDays = 0;
+      }
+
+      return {
+        id: req._id || req.id || `${cleanStart}-${cleanEnd}-${Math.random()}`,
+        leaveType: req.leaveType || "Leave",
+        startDate: cleanStart,
+        endDate: cleanEnd,
+        totalDays: totalDays,
+        status: req.status || "Pending",
+        reason: req.reason || "",
+      };
+    });
+
+    
+    return mapped;
+  } catch (err) {
+   
+    return [];
+  }
 };
 
-export const listenToMyLeaveRequests = async (email: string, callback: Function) => {
-  const empId = await fetchEmployeeId(email);
-  if (!empId) return () => { };
+export const getMyLeaveRequests = async (email: string) => {
+  return fetchMyLeaveRequestsFromApi(email);
+};
 
-  const datesRef = collection(DB.db, "Leave-req", empId, "dates");
+export const listenToMyLeaveRequests = (
+  email: string,
+  callback: (data: any[]) => void
+) => {
+  let cancelled = false;
 
-  return onSnapshot(datesRef, (snapshot) => {
-    const list = snapshot.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    }));
-    callback(list);
-  });
+  const run = async () => {
+    try {
+      const list = await fetchMyLeaveRequestsFromApi(email);
+      if (cancelled) return;
+      callback(list);
+    } catch {
+      if (cancelled) return;
+      callback([]);
+    }
+  };
+
+  void run();
+  const id = window.setInterval(run, 30000);
+
+  return () => {
+    cancelled = true;
+    window.clearInterval(id);
+  };
 };

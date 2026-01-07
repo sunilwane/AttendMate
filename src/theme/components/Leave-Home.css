@@ -1,26 +1,21 @@
 .leave-container-fixed {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
   position: relative;
+  width: 100%;
 }
 
 .leave-fixed-header {
-  flex-shrink: 0;
   padding-bottom: 10px;
 }
+
 .no-data {
   text-align: center;
   color: var(--ion-color-medium);
-  padding: 20px;
+  padding: 40px 20px;
   font-size: 15px;
 }
 
-
 .records-scroll-area {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 16px 140px;
+  padding: 0 16px 120px;
 }
 
 .fab-wrapper {
