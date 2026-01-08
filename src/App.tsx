@@ -9,7 +9,6 @@ import { IonRouterOutlet } from "@ionic/react";
 import { Route, Redirect } from "react-router-dom";
 import GlobalNetworkGuard from "./Network/GlobalNetworkGuard";
 
-
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { Device } from "@capacitor/device";
 
@@ -18,6 +17,9 @@ import HomeTabs from "./routes/Routing";
 import LeaveReqPage from "./pages/LeaveReqPage";
 import LeaveForm from "./components/Leave-Form";
 import HelpSupportPage from "./pages/HelpSupportPage";
+import NotificationsPage from "./pages/NotificationsPage";
+
+import { initPushNotifications } from "./Services/PushNotificationSetup";
 
 import "@ionic/react/css/core.css";
 import "@ionic/react/css/normalize.css";
@@ -33,7 +35,6 @@ import "./theme/variables.css";
 
 setupIonicReact();
 
-
 const updateStatusBarForInvertedCutout = async () => {
     try {
         const info = await Device.getInfo();
@@ -42,19 +43,16 @@ const updateStatusBarForInvertedCutout = async () => {
         const isDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
 
         if (isDarkMode) {
-
             await StatusBar.setBackgroundColor({ color: "#ffffff" });
             await StatusBar.setStyle({ style: Style.Dark });
         } else {
-
             await StatusBar.setBackgroundColor({ color: "#000000" });
             await StatusBar.setStyle({ style: Style.Light });
         }
 
-
         await StatusBar.setOverlaysWebView({ overlay: true });
     } catch (error) {
-       
+
     }
 };
 
@@ -76,6 +74,12 @@ const App: React.FC = () => {
         const saved = localStorage.getItem("isLoggedIn");
         setIsLoggedIn(saved === "true");
     }, []);
+
+    useEffect(() => {
+        if (isLoggedIn) {
+            initPushNotifications();
+        }
+    }, [isLoggedIn]);
 
     const handleLogin = (email: string) => {
         localStorage.setItem("isLoggedIn", "true");
@@ -134,6 +138,9 @@ const App: React.FC = () => {
                         </Route>
                         <Route path="/help-support">
                             {isLoggedIn ? <HelpSupportPage /> : <Redirect to="/login" />}
+                        </Route>
+                        <Route path="/notifications">
+                            {isLoggedIn ? <NotificationsPage /> : <Redirect to="/login" />}
                         </Route>
                     </IonRouterOutlet>
                 </IonReactRouter>

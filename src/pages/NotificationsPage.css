@@ -1,0 +1,71 @@
+.notifications-page-content {
+    --background: #f4f5f8;
+}
+
+.page-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+.notification-list {
+    background: transparent;
+    padding-top: 10px;
+}
+
+.notification-item {
+    --background: #ffffff;
+    margin-bottom: 1px;
+    --padding-start: 16px;
+    --padding-end: 16px;
+    --padding-top: 12px;
+    --padding-bottom: 12px;
+}
+
+.notification-item.unread {
+    --background: #f0f9ff;
+    border-left: 4px solid #007aff;
+}
+
+.notification-title {
+    font-weight: 600;
+    font-size: 16px;
+    color: #1a1a1a;
+    margin-bottom: 4px;
+}
+
+.notification-message {
+    color: #4a4a4a;
+    font-size: 14px;
+    line-height: 1.4;
+    margin-bottom: 6px;
+}
+
+.notification-time {
+    font-size: 12px;
+    color: #8c8c8c;
+}
+
+.unread-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #007aff;
+    border-radius: 50%;
+    margin-left: 8px;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 60vh;
+    color: #999;
+}
+
+.empty-state ion-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+    color: #ccc;
+}

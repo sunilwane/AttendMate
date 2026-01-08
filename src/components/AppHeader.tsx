@@ -19,7 +19,7 @@ import "../theme/components/AppHeader.css";
 import { fetchHeaderUserData } from "../Services/HeaderService";
 import ConfirmLogoutPopup from "./ConfirmLogoutPopup";
 import Notifications from "./Notifications";
-import { fetchNotifications } from "../Services/NotificationService";
+import { fetchNotifications, fetchUnreadCount } from "../Services/NotificationService";
 
 const AppHeader: React.FC<{ title?: string }> = ({ title = "AttendMate" }) => {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -49,13 +49,13 @@ const AppHeader: React.FC<{ title?: string }> = ({ title = "AttendMate" }) => {
       setLoadingPhoto(false);
     };
 
-    const loadInitialNotifications = async () => {
-      const data = await fetchNotifications();
-      setUnreadCount(data.filter(n => !n.isRead).length);
+    const loadInitialUnreadCount = async () => {
+      const count = await fetchUnreadCount();
+      setUnreadCount(count);
     };
 
     loadUserData();
-    loadInitialNotifications();
+    loadInitialUnreadCount();
   }, [userEmail]);
 
   const logout = () => {
